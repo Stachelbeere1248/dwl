@@ -8,20 +8,28 @@ static const int sloppyfocus               = 1;  /* focus follows mouse */
 static const int bypass_surface_visibility = 0;  /* 1 means idle inhibitors will disable idle tracking even if it's surface isn't visible  */
 static const unsigned int borderpx         = 1;  /* border pixel of windows */
 static const int draw_minimal_borders      = 1; /* merge adjacent borders */
-static const float rootcolor[]             = COLOR(0x222222ff);
-static const float bordercolor[]           = COLOR(0x444444ff);
-static const float focuscolor[]            = COLOR(0x005577ff);
-static const float urgentcolor[]           = COLOR(0xff0000ff);
 /* This conforms to the xdg-protocol. Set the alpha to zero to restore the old behavior */
 static const float fullscreen_bg[]         = {0.1f, 0.1f, 0.1f, 1.0f}; /* You can also use glsl colors */
 static const char *cursor_theme            = "Adwaita";
 static const char cursor_size[]            = "24"; /* Make sure it's a valid integer, otherwise things will break */
 static const float resize_factor           = 0.0002f; /* Resize multiplier for mouse resizing, depends on mouse sensivity. */
 static const uint32_t resize_interval_ms   = 16; /* Resize interval depends on framerate and screen refresh rate. */
+static const int showbar                   = 1; /* 0 means no bar */
+static const int topbar                    = 1; /* 0 means bottom bar */
+static const char *fonts[]                 = {"monospace:size=12"};
+static const float rootcolor[]             = COLOR(0x6495eded);
+/* This conforms to the xdg-protocol. Set the alpha to zero to restore the old behavior */
+static uint32_t colors[][3]                = {
+	/*               fg          bg          border    */
+	[SchemeNorm] = { 0xff7777ff, 0x000000c0, 0x30346dff },
+	[SchemeSel]  = { 0xff7777ff, 0x00000050, 0x6495edff },
+	[SchemeUrg]  = { 0,          0,          0xffaaaaff },
+};
 
 enum Direction { DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN };
 /* tagging - TAGCOUNT must be no greater than 31 */
-#define TAGCOUNT (9)
+static char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+#define TAGCOUNT (sizeof(tags) / sizeof(tags[0]))
 
 /* logging */
 static int log_level = WLR_ERROR;
@@ -38,18 +46,19 @@ static const char *const autostart[] = {
 /* NOTE: ALWAYS keep a rule declared even if you don't use rules (e.g leave at least one example) */
 static const Rule rules[] = {
 
-	/* app_id          title       tagsmask isfloating  skipfocus isterm  noswallow  monitor */
+	/* app_id             title       tags mask     isfloating  skipfocus isterm  noswallow  monitor */
 	/* examples: */
-	{ "firefox",       NULL,       0,       0,          0,         0,      0,         -1 }, /* Start on tag 9 floating: 1<<8, not tiled */
-	{ "foot",          NULL,       0,       0,          0,         1,      1,         -1 }, /* make foot swallow clients that are not foot */
+	{ "Gimp_EXAMPLE",     NULL,       0,            1,          0,         0,      0,         -1 }, /* Start on currently visible tags floating, not tiled */
+	{ "firefox_EXAMPLE",  NULL,       1 << 8,       0,          0,         0,      0,         -1 }, /* Start on ONLY tag "9" */
+	{ "foot",             NULL,       0,            0,          0,         1,      1,         -1 }, /* make foot swallow clients that are not foot */
 };
 
 /* layout(s) */
 static const Layout layouts[] = {
 	/* symbol     arrange function */
+	{ "|w|",      btrtile },
 	{ "[]=",      tile },
 	{ "><>",      NULL },    /* no layout function means floating behavior */
-	{ "|w|",      btrtile },
 	{ "[M]",      monocle },
 };
 
@@ -151,43 +160,44 @@ static const char *prevTrack[] = { "playerctl", "previous", NULL };
 
 #include "keys.h"
 static const Key keys[] = {
-	/* modifier                  key          function        argument */
-	{ MODKEY,                    Key_d,       spawn,          {.v = menucmd} },
-	{ MODKEY,                    Key_Return,  spawn,          {.v = termcmd} },
-	{ 0,               XKB_KEY_XF86AudioRaiseVolume, spawn,          {.v = upvol } },
-	{ 0,               XKB_KEY_XF86AudioLowerVolume, spawn,          {.v = downvol } },
-	{ 0,                    XKB_KEY_XF86AudioMute,   spawn,          {.v = mutevol } },
-	{ 0,                    XKB_KEY_XF86AudioPlay,   spawn,          {.v = playpause } },
-	{ 0,                    XKB_KEY_XF86AudioNext,   spawn,          {.v = nextTrack } },
-	{ 0,                    XKB_KEY_XF86AudioPrev,   spawn,          {.v = prevTrack } },
-  { MODKEY,                    Key_s,       spawn,          SHCMD("wl-ss") },
-	{ MODKEY|WLR_MODIFIER_SHIFT, Key_s,       spawn,          SHCMD("wl-fullss") },
-	{ MODKEY,                    Key_b,       togglebar,      {0} },
-	{ MODKEY,                    Key_j,       focusstack,     {.i = +1} },
-	{ MODKEY,                    Key_k,       focusstack,     {.i = -1} },
-	{ MODKEY,                    Key_o,       incnmaster,     {.i = +1} },
-	{ MODKEY,                    Key_p,       incnmaster,     {.i = -1} },
-	{ MODKEY,                    Key_h,       setmfact,       {.f = -0.05f} },
-	{ MODKEY,                    Key_l,       setmfact,       {.f = +0.05f} },
-	{ MODKEY,                    Key_Return,  zoom,           {0} },
-	{ MODKEY,                    Key_Tab,     view,           {0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, Key_q,       killclient,     {0} },
-	{ MODKEY,                    Key_t,       setlayout,      {.v = &layouts[0]} },
-	{ MODKEY,                    Key_f,       setlayout,      {.v = &layouts[1]} },
-	{ MODKEY,                    Key_m,       setlayout,      {.v = &layouts[2]} },
-	{ MODKEY,                    Key_space,   setlayout,      {0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, Key_space,   togglefloating, {0} },
-	{ MODKEY,                    Key_e,       togglefullscreen, {0} },
-	{ MODKEY,                    Key_0,       view,           {.ui = ~0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, Key_0,       tag,            {.ui = ~0} },
-	{ MODKEY,                    Key_comma,   focusmon,       {.i = WLR_DIRECTION_LEFT} },
-	{ MODKEY,                    Key_period,  focusmon,       {.i = WLR_DIRECTION_RIGHT} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, Key_comma,   tagmon,         {.i = WLR_DIRECTION_LEFT} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, Key_period,  tagmon,         {.i = WLR_DIRECTION_RIGHT} },
-	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Right,   setratio_h,     {.f = +0.025f} },
-	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Left,    setratio_h,     {.f = -0.025f} },
-	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Up,      setratio_v,     {.f = -0.025f} },
-	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Down,    setratio_v,     {.f = +0.025f} },
+	/* modifier                  key                       function        argument */
+	{ MODKEY,                    Key_d,                    spawn,          {.v = menucmd} },
+	{ MODKEY,                    Key_Return,               spawn,          {.v = termcmd} },
+	{ 0,                         Key_XF86AudioRaiseVolume, spawn,          {.v = upvol } },
+	{ 0,                         Key_XF86AudioLowerVolume, spawn,          {.v = downvol } },
+	{ 0,                         Key_XF86AudioMute,        spawn,          {.v = mutevol } },
+	{ 0,                         Key_XF86AudioPlay,        spawn,          {.v = playpause } },
+	{ 0,                         Key_XF86AudioNext,        spawn,          {.v = nextTrack } },
+	{ 0,                         Key_XF86AudioPrev,        spawn,          {.v = prevTrack } },
+  { MODKEY,                    Key_s,                    spawn,          SHCMD("wl-ss") },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_s,                    spawn,          SHCMD("wl-fullss") },
+	{ MODKEY,                    Key_b,                    togglebar,      {0} },
+	{ MODKEY,                    Key_r,                    regions,        SHCMD("grim -g \"$(slurp)\"") },
+	{ MODKEY,                    Key_j,                    focusstack,     {.i = +1} },
+	{ MODKEY,                    Key_k,                    focusstack,     {.i = -1} },
+	{ MODKEY,                    Key_o,                    incnmaster,     {.i = +1} },
+	{ MODKEY,                    Key_p,                    incnmaster,     {.i = -1} },
+	{ MODKEY,                    Key_h,                    setmfact,       {.f = -0.05f} },
+	{ MODKEY,                    Key_l,                    setmfact,       {.f = +0.05f} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_Return,               zoom,           {0} },
+	{ MODKEY,                    Key_Tab,                  view,           {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_q,                    killclient,     {0} },
+	{ MODKEY,                    Key_w,                    setlayout,      {.v = &layouts[0]} },
+	{ MODKEY,                    Key_t,                    setlayout,      {.v = &layouts[1]} },
+	{ MODKEY,                    Key_f,                    setlayout,      {.v = &layouts[2]} },
+	{ MODKEY,                    Key_space,                setlayout,      {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_space,                togglefloating, {0} },
+	{ MODKEY,                    Key_e,                    togglefullscreen, {0} },
+	{ MODKEY,                    Key_0,                    view,           {.ui = ~0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_0,                    tag,            {.ui = ~0} },
+	{ MODKEY,                    Key_comma,                focusmon,       {.i = WLR_DIRECTION_LEFT} },
+	{ MODKEY,                    Key_period,               focusmon,       {.i = WLR_DIRECTION_RIGHT} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_comma,                tagmon,         {.i = WLR_DIRECTION_LEFT} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_period,               tagmon,         {.i = WLR_DIRECTION_RIGHT} },
+	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Right,                setratio_h,     {.f = +0.025f} },
+	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Left,                 setratio_h,     {.f = -0.025f} },
+	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Up,                   setratio_v,     {.f = -0.025f} },
+	{ MODKEY|WLR_MODIFIER_CTRL,  Key_Down,                 setratio_v,     {.f = +0.025f} },
 	TAGKEYS(                     Key_1,                       0),
 	TAGKEYS(                     Key_2,                       1),
 	TAGKEYS(                     Key_3,                       2),
@@ -197,7 +207,7 @@ static const Key keys[] = {
 	TAGKEYS(                     Key_7,                       6),
 	TAGKEYS(                     Key_8,                       7),
 	TAGKEYS(                     Key_9,                       8),
-	{ MODKEY|WLR_MODIFIER_SHIFT, Key_e,       quit,           {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, Key_e,                    quit,           {0} },
 
 	/* Ctrl-Alt-Backspace and Ctrl-Alt-Fx used to be handled by X server */
 	{ WLR_MODIFIER_CTRL|WLR_MODIFIER_ALT,Key_BackSpace, quit, {0} },
@@ -211,7 +221,15 @@ static const Key keys[] = {
 };
 
 static const Button buttons[] = {
-	{ MODKEY, BTN_LEFT,   moveresize,     {.ui = CurMove} },
-	{ MODKEY, BTN_MIDDLE, togglefloating, {0} },
-	{ MODKEY, BTN_RIGHT,  moveresize,     {.ui = CurResize} },
+	{ ClkLtSymbol, 0,      BTN_LEFT,   setlayout,      {.v = &layouts[0]} },
+	{ ClkLtSymbol, 0,      BTN_RIGHT,  setlayout,      {.v = &layouts[2]} },
+	{ ClkTitle,    0,      BTN_MIDDLE, zoom,           {0} },
+	{ ClkStatus,   0,      BTN_MIDDLE, spawn,          {.v = termcmd} },
+	{ ClkClient,   MODKEY, BTN_LEFT,   moveresize,     {.ui = CurMove} },
+	{ ClkClient,   MODKEY, BTN_MIDDLE, togglefloating, {0} },
+	{ ClkClient,   MODKEY, BTN_RIGHT,  moveresize,     {.ui = CurResize} },
+	{ ClkTagBar,   0,      BTN_LEFT,   view,           {0} },
+	{ ClkTagBar,   0,      BTN_RIGHT,  toggleview,     {0} },
+	{ ClkTagBar,   MODKEY, BTN_LEFT,   tag,            {0} },
+	{ ClkTagBar,   MODKEY, BTN_RIGHT,  toggletag,      {0} },
 };
