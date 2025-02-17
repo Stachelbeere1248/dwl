@@ -139,7 +139,7 @@ typedef struct {
 #endif
 	unsigned int bw;
 	uint32_t tags;
-	int isfloating, isurgent, isfullscreen;
+	int isfloating, isurgent, isfullscreen, skipfocus;
 	uint32_t resize; /* configure serial of a pending resize */
 } Client;
 
@@ -230,6 +230,7 @@ typedef struct {
 	const char *title;
 	uint32_t tags;
 	int isfloating;
+	int skipfocus;
 	int monitor;
 } Rule;
 
@@ -470,6 +471,7 @@ applyrules(Client *c)
 		if ((!r->title || strstr(title, r->title))
 				&& (!r->id || strstr(appid, r->id))) {
 			c->isfloating = r->isfloating;
+			c->skipfocus = r->skipfocus;
 			newtags |= r->tags;
 			i = 0;
 			wl_list_for_each(m, &mons, link) {
@@ -1347,6 +1349,13 @@ focusclient(Client *c, int lift)
 	if (locked)
 		return;
 
+	if (c && c->skipfocus != 0){
+		if (c -> skipfocus == 1) {
+			c->skipfocus = 0;
+		}
+		return;
+	}
+
 	/* Raise client in stacking order if requested */
 	if (c && lift)
 		wlr_scene_node_raise_to_top(&c->scene->node);
@@ -1741,11 +1750,13 @@ mapnotify(struct wl_listener *listener, void *data)
 	printstatus();
 
 unset_fullscreen:
-	m = c->mon ? c->mon : xytomon(c->geom.x, c->geom.y);
-	wl_list_for_each(w, &clients, link) {
-		if (w != c && w != p && w->isfullscreen && m == w->mon && (w->tags & c->tags))
-			setfullscreen(w, 0);
-	}
+    if (!c->skipfocus) {
+        m = c->mon ? c->mon : xytomon(c->geom.x, c->geom.y);
+        wl_list_for_each(w, &clients, link) {
+            if (w != c && w != p && w->isfullscreen && m == w->mon && (w->tags & c->tags))
+                setfullscreen(w, 0);
+        }
+    }
 }
 
 void
